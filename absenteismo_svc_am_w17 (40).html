@@ -238,6 +238,26 @@ footer{background:#111;padding:16px 28px;display:flex;align-items:center;justify
 
 
 
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Reincidentes</div>
+      <div class="section-line"></div>
+      <div class="section-count" id="reinc-count-label">—</div>
+    </div>
+    <div class="reinc-table-wrap">
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead><tr>
+            <th>Operador</th><th>Team Leader</th><th>Empresa</th>
+            <th class="num">FI</th><th class="num">FJ</th>
+            <th class="num">Total</th><th>Tipos</th>
+          </tr></thead>
+          <tbody id="reinc-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- TL DETAIL -->
   <div id="tl-detail-section" style="display:none">
     <div class="section">
@@ -2226,7 +2246,7 @@ function updateChart(){
 // ── APPLY FILTERS ─────────────────────────────────────────────────────────────
 function applyFilters(){
   const rows=getFiltered(),tlAgg=aggregateByTL(rows);
-  renderKPIs(tlAgg);renderFarol(tlAgg);renderTLDetail();updateChart();
+  renderKPIs(tlAgg);renderFarol(tlAgg);renderReinc();renderTLDetail();updateChart();
   renderAgencias();
   renderPadroesTab();
   const summary=document.getElementById('filter-summary'),parts=[];
