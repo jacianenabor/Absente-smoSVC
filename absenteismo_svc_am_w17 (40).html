@@ -167,10 +167,10 @@ footer{background:#111;padding:16px 28px;display:flex;align-items:center;justify
       <div>
         <div class="badge">Service Center Campinas</div>
         <h1>Absente<span>ísmo</span></h1>
-        <div class="header-meta">W15–W17 &nbsp;·&nbsp; 10 a 28 de abril de 2026</div>
+        <div class="header-meta" id="header-period">Carregue um CSV para ver o período</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
-        <div class="meta-badge"><span class="dot"></span>Meta ≤ 5% &nbsp;·&nbsp; Atualizado 28/04</div>
+        <div class="meta-badge"><span class="dot"></span>Meta ≤ 5% &nbsp;·&nbsp; <span id="header-updated">Atualizado —</span></div>
         <label class="csv-upload-area" id="csv-drop" ondragover="csvDrag(event,true)" ondragleave="csvDrag(event,false)" ondrop="csvDrop(event)">
           <input type="file" accept=".csv" id="csv-input" onchange="csvLoad(this.files[0])">
           <span style="font-size:18px">📂</span>
@@ -2244,6 +2244,23 @@ function updateChart(){
 }
 
 // ── APPLY FILTERS ─────────────────────────────────────────────────────────────
+function updateHeaderPeriod(){
+  if(!dailyDates.length)return;
+  const sorted=[...dailyDates].sort((a,b)=>{
+    const [da,ma]=[parseInt(a),parseInt(a.slice(3))];
+    const [db,mb]=[parseInt(b),parseInt(b.slice(3))];
+    return ma!==mb?ma-mb:da-db;
+  });
+  const first=sorted[0], last=sorted[sorted.length-1];
+  const lastDate=last+'/'+'2026';
+  // Format: "29/03 a 28/04/2026"
+  const period=first+' a '+last+'/2026';
+  const el=document.getElementById('header-period');
+  if(el)el.textContent=period;
+  const upd=document.getElementById('header-updated');
+  if(upd)upd.textContent='Atualizado '+last;
+}
+
 function applyFilters(){
   const rows=getFiltered(),tlAgg=aggregateByTL(rows);
   renderKPIs(tlAgg);renderFarol(tlAgg);renderReinc();renderTLDetail();updateChart();
@@ -2371,7 +2388,7 @@ function parseCSV(text){
   faltantes.forEach(r=>{if(!opMap[r.nome])opMap[r.nome]={fi:0,fj:0,dates:[],tl:r.tl,empresa:r.empresa,sup:r.sup};opMap[r.nome].fi+=r.fi;opMap[r.nome].fj+=r.fj;if(!opMap[r.nome].dates.includes(r.date))opMap[r.nome].dates.push(r.date);});
   reincidentes=Object.entries(opMap).filter(([,v])=>v.dates.length>=2).map(([nome,v])=>({nome,...v})).sort((a,b)=>(b.fi+b.fj)-(a.fi+a.fj));
   dailyDates=[...new Set(rawData.map(r=>r.date))].sort((a,b)=>{const [da,ma]=[parseInt(a),parseInt(a.slice(3))],[db,mb]=[parseInt(b),parseInt(b.slice(3))];return ma!==mb?ma-mb:da-db;});
-  applyFilters();initChart();
+  initChart();applyFilters();updateHeaderPeriod();
 }
 
 // ── TOOLTIP ───────────────────────────────────────────────────────────────────
@@ -2388,6 +2405,7 @@ reincidentes=DEMO_REINC;
 dailyDates=ALL_DATES;
 initChart();
 applyFilters();
+updateHeaderPeriod();
 </script>
 </body>
 </html>
