@@ -2344,8 +2344,20 @@ function csvDrop(e){e.preventDefault();document.getElementById('csv-drop').class
 function csvLoad(file){
   if(!file)return;
   const reader=new FileReader();
+  // Try UTF-8 first, then Latin1
+  reader.onerror=()=>{
+    const r2=new FileReader();
+    r2.onload=e=>{try{parseCSV(e.target.result);}catch(err){document.getElementById('csv-status').textContent='Erro: '+err.message;}};
+    r2.readAsText(file,'ISO-8859-1');
+  };
   reader.onload=e=>{
-    try{parseCSV(e.target.result);document.getElementById('csv-status').textContent='✓ '+file.name;document.getElementById('csv-status').style.cssText='background:rgba(26,122,74,.15);color:#1a7a4a;border:1px solid rgba(26,122,74,.3);font-family:DM Mono,monospace;font-size:10px;padding:3px 8px;border-radius:4px;white-space:nowrap';}
+    try{
+      parseCSV(e.target.result);
+      if(rawData.length>0){
+        document.getElementById('csv-status').textContent='✓ '+file.name+' ('+rawData.length+' linhas)';
+        document.getElementById('csv-status').style.cssText='background:rgba(26,122,74,.15);color:#1a7a4a;border:1px solid rgba(26,122,74,.3);font-family:DM Mono,monospace;font-size:10px;padding:3px 8px;border-radius:4px;white-space:nowrap';
+      }
+    }
     catch(err){
       console.error('CSV error:',err);
       document.getElementById('csv-status').textContent='Erro: '+err.message;
@@ -2368,16 +2380,42 @@ function parseCSVLine(line){
 }
 
 function parseCSV(text){
-  // Try to detect encoding issues and fix common problems
+  // Remove BOM if present
+  text=text.replace(/^\uFEFF/,'');
   const lines=text.trim().split(/\r?\n/);
-  const headers=parseCSVLine(lines[0]).map(h=>h.trim().replace(/^\uFEFF/,'').replace(/"/g,''));
+  
+  // Auto-detect delimiter: comma or semicolon
+  const firstLine=lines[0];
+  const delim=firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+  console.log('CSV delimiter detected:', delim===',' ? 'comma' : 'semicolon');
+  
+  // Parser for detected delimiter
+  function parseLine(line){
+    const result=[];let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){inQ=!inQ;}
+      else if(c===delim&&!inQ){result.push(cur.trim());cur='';}
+      else cur+=c;
+    }
+    result.push(cur.trim());
+    return result;
+  }
+  
+  const headers=parseLine(firstLine).map(h=>h.trim().replace(/"/g,''));
+  console.log('Columns found:', headers);
   const col=n=>headers.indexOf(n);
-  const iNome=col('Nome_Completo'),iTL=col('Nome_TL'),iEmp=col('Empresa'),iStatus=col('Status_Reporte'),iData=col('Data_Ops'),iEsc=col('Status_Escala'),iSup=col('SUPERVISOR');
-  // Validate required columns exist
+  const iNome=col('Nome_Completo'),iTL=col('Nome_TL'),iEmp=col('Empresa'),
+        iStatus=col('Status_Reporte'),iData=col('Data_Ops'),
+        iEsc=col('Status_Escala'),iSup=col('SUPERVISOR');
+
+  // Validate required columns
   if(iNome<0||iTL<0||iStatus<0||iData<0){
-    document.getElementById('csv-status').textContent='Colunas não encontradas';
+    const missing=['Nome_Completo','Nome_TL','Status_Reporte','Data_Ops']
+      .filter(c=>headers.indexOf(c)<0);
+    document.getElementById('csv-status').textContent='Coluna faltando: '+missing.join(', ');
     document.getElementById('csv-status').style.cssText='background:rgba(181,32,32,.15);color:#b52020;border:1px solid rgba(181,32,32,.3);font-family:DM Mono,monospace;font-size:10px;padding:3px 8px;border-radius:4px;white-space:nowrap';
-    console.error('Colunas encontradas:',headers);
+    console.error('Missing columns:',missing,'Found:',headers);
     return;
   }
   const FI=['FI - Falta Injustificada','AB - Abandono'];
@@ -2387,7 +2425,7 @@ function parseCSV(text){
   const JAC_SUPS=['JACIANE NABOR DE ALMEIDA'];
   const rawRows=[];
   for(let i=1;i<lines.length;i++){
-    const cols=parseCSVLine(lines[i]).map(c=>c.replace(/"/g,''));
+    const cols=parseLine(lines[i]).map(c=>c.replace(/"/g,''));
     if(cols.length<5)continue;
     const sr=cols[iStatus]||'',escSt=cols[iEsc]||'';
     if(escSt!=='DIA DE TRABALHO'||EXC.includes(sr))continue;
