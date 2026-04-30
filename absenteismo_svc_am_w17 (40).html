@@ -2346,15 +2346,40 @@ function csvLoad(file){
   const reader=new FileReader();
   reader.onload=e=>{
     try{parseCSV(e.target.result);document.getElementById('csv-status').textContent='✓ '+file.name;document.getElementById('csv-status').style.cssText='background:rgba(26,122,74,.15);color:#1a7a4a;border:1px solid rgba(26,122,74,.3);font-family:DM Mono,monospace;font-size:10px;padding:3px 8px;border-radius:4px;white-space:nowrap';}
-    catch(err){document.getElementById('csv-status').textContent='Erro no CSV';}
+    catch(err){
+      console.error('CSV error:',err);
+      document.getElementById('csv-status').textContent='Erro: '+err.message;
+      document.getElementById('csv-status').style.cssText='background:rgba(181,32,32,.15);color:#b52020;border:1px solid rgba(181,32,32,.3);font-family:DM Mono,monospace;font-size:10px;padding:3px 8px;border-radius:4px;white-space:nowrap';
+    }
   };
   reader.readAsText(file,'UTF-8');
 }
+function parseCSVLine(line){
+  // Proper CSV parser respecting quoted fields
+  const result=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){inQ=!inQ;}
+    else if(c===','&&!inQ){result.push(cur.trim());cur='';}
+    else cur+=c;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function parseCSV(text){
+  // Try to detect encoding issues and fix common problems
   const lines=text.trim().split(/\r?\n/);
-  const headers=lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+  const headers=parseCSVLine(lines[0]).map(h=>h.trim().replace(/^\uFEFF/,'').replace(/"/g,''));
   const col=n=>headers.indexOf(n);
   const iNome=col('Nome_Completo'),iTL=col('Nome_TL'),iEmp=col('Empresa'),iStatus=col('Status_Reporte'),iData=col('Data_Ops'),iEsc=col('Status_Escala'),iSup=col('SUPERVISOR');
+  // Validate required columns exist
+  if(iNome<0||iTL<0||iStatus<0||iData<0){
+    document.getElementById('csv-status').textContent='Colunas não encontradas';
+    document.getElementById('csv-status').style.cssText='background:rgba(181,32,32,.15);color:#b52020;border:1px solid rgba(181,32,32,.3);font-family:DM Mono,monospace;font-size:10px;padding:3px 8px;border-radius:4px;white-space:nowrap';
+    console.error('Colunas encontradas:',headers);
+    return;
+  }
   const FI=['FI - Falta Injustificada','AB - Abandono'];
   const FJ=['FJ - Atestado','FJ - Suspensão','FJ - Falecimento 1º grau','FJ - Gestante','FJ - Abandono','FJ - Folga Prêmio','FJ - Falecimento 2º grau'];
   const EXC=['AF - Afastado INSS','AF - Licença Maternidade','DE - Desligado','FE - Férias','BH - Banco de Horas','FR - Feriado'];
@@ -2362,7 +2387,7 @@ function parseCSV(text){
   const JAC_SUPS=['JACIANE NABOR DE ALMEIDA'];
   const rawRows=[];
   for(let i=1;i<lines.length;i++){
-    const cols=lines[i].split(',').map(c=>c.trim().replace(/"/g,''));
+    const cols=parseCSVLine(lines[i]).map(c=>c.replace(/"/g,''));
     if(cols.length<5)continue;
     const sr=cols[iStatus]||'',escSt=cols[iEsc]||'';
     if(escSt!=='DIA DE TRABALHO'||EXC.includes(sr))continue;
